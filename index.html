@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#070812">
+    <meta name="description" content="Pixel Studio ist ein minimalistischer Bildeditor zum Skalieren, Konvertieren und Optimieren von Fotos.">
+    <title>Pixel Studio</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-block">
+          <div class="brand-mark" aria-hidden="true"></div>
+          <div>
+            <h1>Pixel Studio</h1>
+            <p id="status-label" class="range-label">Bild laden und präzise optimieren</p>
+          </div>
+        </div>
+
+        <nav class="view-tabs" aria-label="Werkzeugmodus">
+          <button class="tab-button is-active" type="button" data-fit="contain">Einpassen</button>
+          <button class="tab-button" type="button" data-fit="cover">Füllen</button>
+          <button class="tab-button" type="button" data-fit="stretch">Strecken</button>
+        </nav>
+
+        <div class="toolbar">
+          <button class="text-button" id="crop-mode-button" type="button" disabled>Zuschneiden</button>
+          <button class="text-button" id="reset-button" type="button">Reset</button>
+          <button class="primary-button" id="download-button" type="button" disabled>Download</button>
+        </div>
+      </header>
+
+      <main class="studio-stage">
+        <section class="preview-shell" aria-label="Bildvorschau">
+          <div class="drop-zone" id="drop-zone">
+            <canvas id="preview-canvas" width="1200" height="800"></canvas>
+          </div>
+        </section>
+
+        <aside class="control-shell" aria-label="Bildoptionen">
+          <label class="upload-button">
+            <input id="file-input" type="file" accept="image/*">
+            Bild auswählen
+          </label>
+
+          <div class="stats-grid">
+            <div>
+              <span>Original</span>
+              <strong id="original-size">-</strong>
+            </div>
+            <div>
+              <span>Export</span>
+              <strong id="export-size">1200 x 800</strong>
+            </div>
+          </div>
+
+          <div class="field-grid">
+            <label class="field">
+              <span>Breite</span>
+              <input id="width-input" type="number" min="1" max="8000" value="1200">
+            </label>
+            <label class="field">
+              <span>Höhe</span>
+              <input id="height-input" type="number" min="1" max="8000" value="800">
+            </label>
+          </div>
+
+          <label class="toggle-row">
+            <input id="lock-ratio" type="checkbox" checked>
+            Seitenverhältnis halten
+          </label>
+
+          <label class="field">
+            <span>Format</span>
+            <select id="format-select">
+              <option value="image/png">PNG</option>
+              <option value="image/jpeg">JPG</option>
+              <option value="image/webp">WebP</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Qualität <output id="quality-output">92%</output></span>
+            <input id="quality-input" type="range" min="10" max="100" value="92">
+          </label>
+
+          <label class="field">
+            <span>Hintergrund</span>
+            <input id="background-input" type="color" value="#070812">
+          </label>
+
+          <div class="crop-panel" id="crop-panel" hidden>
+            <div class="crop-status" id="crop-status">Rahmen im Bild aufziehen</div>
+            <div class="crop-actions">
+              <button class="primary-button" id="apply-crop-button" type="button" disabled>Anwenden</button>
+              <button class="text-button" id="cancel-crop-button" type="button">Abbrechen</button>
+            </div>
+          </div>
+
+          <div class="quick-actions">
+            <button class="quiet-button" type="button" data-preset="1080x1080">1:1</button>
+            <button class="quiet-button" type="button" data-preset="1920x1080">16:9</button>
+            <button class="quiet-button" type="button" data-preset="1080x1920">9:16</button>
+            <button class="quiet-button" type="button" data-preset="1200x630">Open Graph</button>
+          </div>
+        </aside>
+      </main>
+
+      <footer class="footer-actions">
+        <span class="sync-status">Lokal im Browser</span>
+      </footer>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

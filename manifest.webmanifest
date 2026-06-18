@@ -1,0 +1,9 @@
+{
+  "name": "Pixel Studio",
+  "short_name": "Pixel Studio",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#070812",
+  "theme_color": "#070812",
+  "description": "Minimalistischer Bildeditor zum Skalieren, Konvertieren und Optimieren."
+}

@@ -30,6 +30,10 @@ let cropActive = false;
 let cropDragging = false;
 let cropStart = null;
 let cropRect = null;
+let imagePan = { x: 0, y: 0 };
+let imageDragging = false;
+let imageDragStart = null;
+let imagePanStart = null;
 
 function setStatus(text) {
   statusLabel.textContent = text;
@@ -115,7 +119,7 @@ function drawImage(showOverlay = true) {
     }
   }
 
-  ctx.drawImage(sourceImage, offsetX, offsetY, drawWidth, drawHeight);
+  ctx.drawImage(sourceImage, offsetX + imagePan.x, offsetY + imagePan.y, drawWidth, drawHeight);
   syncExportLabel();
   if (showOverlay) drawCropOverlay();
 }
@@ -129,8 +133,11 @@ function setCropMode(active) {
   cropDragging = false;
   cropStart = null;
   cropRect = null;
+  imageDragging = false;
   cropPanel.hidden = !cropActive;
   canvas.classList.toggle("is-cropping", cropActive);
+  canvas.classList.toggle("is-draggable", Boolean(sourceImage) && !cropActive);
+  canvas.classList.remove("is-panning");
   cropModeButton.classList.toggle("is-active", cropActive);
   applyCropButton.disabled = true;
   cropStatus.textContent = "Rahmen im Bild aufziehen";
@@ -183,6 +190,7 @@ function applyCrop() {
   image.addEventListener("load", () => {
     sourceImage = image;
     ratio = image.width / image.height;
+    imagePan = { x: 0, y: 0 };
     widthInput.value = image.width;
     heightInput.value = image.height;
     originalSize.textContent = `${image.width} x ${image.height}`;
@@ -207,6 +215,7 @@ function loadFile(file) {
       sourceImage = image;
       sourceName = file.name.replace(/\.[^.]+$/, "") || "pixel-studio";
       ratio = image.width / image.height;
+      imagePan = { x: 0, y: 0 };
       originalSize.textContent = `${image.width} x ${image.height}`;
       if (lockRatio.checked) {
         widthInput.value = image.width;
@@ -214,6 +223,7 @@ function loadFile(file) {
       }
       downloadButton.disabled = false;
       cropModeButton.disabled = false;
+      canvas.classList.add("is-draggable");
       setCropMode(false);
       setStatus(`${file.name} geladen`);
       drawImage();
@@ -260,20 +270,41 @@ dropZone.addEventListener("drop", (event) => {
 });
 
 canvas.addEventListener("pointerdown", (event) => {
-  if (!cropActive || !sourceImage) return;
+  if (!sourceImage) return;
   event.preventDefault();
   canvas.setPointerCapture(event.pointerId);
-  cropDragging = true;
-  cropStart = getCanvasPoint(event);
-  cropRect = { x: cropStart.x, y: cropStart.y, width: 0, height: 0 };
-  refreshCropStatus();
-  drawImage();
+  const point = getCanvasPoint(event);
+
+  if (cropActive) {
+    cropDragging = true;
+    cropStart = point;
+    cropRect = { x: cropStart.x, y: cropStart.y, width: 0, height: 0 };
+    refreshCropStatus();
+    drawImage();
+    return;
+  }
+
+  imageDragging = true;
+  imageDragStart = point;
+  imagePanStart = { ...imagePan };
+  canvas.classList.add("is-panning");
 });
 
 canvas.addEventListener("pointermove", (event) => {
-  if (!cropActive || !cropDragging || !cropStart) return;
+  if (!sourceImage) return;
   event.preventDefault();
   const point = getCanvasPoint(event);
+
+  if (imageDragging && imageDragStart && imagePanStart) {
+    imagePan = {
+      x: imagePanStart.x + point.x - imageDragStart.x,
+      y: imagePanStart.y + point.y - imageDragStart.y,
+    };
+    drawImage();
+    return;
+  }
+
+  if (!cropActive || !cropDragging || !cropStart) return;
   cropRect = {
     x: cropStart.x,
     y: cropStart.y,
@@ -285,11 +316,27 @@ canvas.addEventListener("pointermove", (event) => {
 });
 
 canvas.addEventListener("pointerup", (event) => {
-  if (!cropActive || !cropDragging) return;
-  cropDragging = false;
+  if (!sourceImage) return;
+  if (imageDragging) {
+    imageDragging = false;
+    imageDragStart = null;
+    imagePanStart = null;
+    canvas.classList.remove("is-panning");
+  }
+  if (cropActive && cropDragging) {
+    cropDragging = false;
+    refreshCropStatus();
+    drawImage();
+  }
   canvas.releasePointerCapture(event.pointerId);
-  refreshCropStatus();
-  drawImage();
+});
+
+canvas.addEventListener("pointercancel", () => {
+  imageDragging = false;
+  cropDragging = false;
+  imageDragStart = null;
+  imagePanStart = null;
+  canvas.classList.remove("is-panning");
 });
 
 fitButtons.forEach((button) => {
@@ -311,6 +358,7 @@ presetButtons.forEach((button) => {
 
 resetButton.addEventListener("click", () => {
   setCropMode(false);
+  imagePan = { x: 0, y: 0 };
   widthInput.value = sourceImage ? sourceImage.width : 1200;
   heightInput.value = sourceImage ? sourceImage.height : 800;
   backgroundInput.value = "#070812";

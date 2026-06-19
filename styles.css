@@ -115,17 +115,6 @@ p {
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 13px;
-}
-
-.brand-mark {
-  width: 44px;
-  height: 44px;
-  flex: 0 0 auto;
-  clip-path: polygon(50% 0, 100% 27%, 100% 73%, 50% 100%, 0 73%, 0 27%);
-  background:
-    linear-gradient(135deg, var(--yellow), #ff9f1c 24%, var(--magenta) 58%, var(--cyan));
-  box-shadow: 0 0 20px rgba(0, 217, 255, 0.46), 0 0 26px rgba(255, 45, 253, 0.28);
 }
 
 h1 {
@@ -230,6 +219,14 @@ canvas {
 
 canvas.is-cropping {
   cursor: crosshair;
+}
+
+canvas.is-draggable {
+  cursor: grab;
+}
+
+canvas.is-panning {
+  cursor: grabbing;
 }
 
 .control-shell {

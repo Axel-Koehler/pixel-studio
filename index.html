@@ -91,6 +91,30 @@
             <input id="background-input" type="color" value="#070812">
           </label>
 
+          <label class="toggle-row">
+            <input id="transparent-toggle" type="checkbox">
+            Transparenz exportieren
+          </label>
+
+          <div class="effect-panel">
+            <div class="effect-header">Freistellen</div>
+            <div class="field-grid">
+              <label class="field">
+                <span>Farbe</span>
+                <input id="selected-color-input" type="color" value="#ffffff">
+              </label>
+              <label class="field">
+                <span>Toleranz <output id="color-tolerance-output">42</output></span>
+                <input id="color-tolerance-input" type="range" min="0" max="255" value="42">
+              </label>
+            </div>
+            <div class="effect-actions">
+              <button class="text-button" id="pick-color-button" type="button" disabled>Farbe wählen</button>
+              <button class="primary-button" id="remove-color-button" type="button" disabled>Farbe entfernen</button>
+              <button class="primary-button" id="remove-background-button" type="button" disabled>Hintergrund entfernen</button>
+            </div>
+          </div>
+
           <div class="crop-panel" id="crop-panel" hidden>
             <div class="crop-status" id="crop-status">Rahmen im Bild aufziehen</div>
             <div class="crop-actions">

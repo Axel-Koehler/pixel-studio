@@ -149,6 +149,9 @@ function updateTolerance() {
 function setTransparentMode(active) {
   transparentBackground = active;
   transparentToggle.checked = active;
+  if (active && formatSelect.value === "image/jpeg") {
+    formatSelect.value = "image/png";
+  }
   drawImage();
 }
 
@@ -537,6 +540,8 @@ presetButtons.forEach((button) => {
 resetButton.addEventListener("click", () => {
   setCropMode(false);
   imagePan = { x: 0, y: 0 };
+  transparentBackground = false;
+  transparentToggle.checked = false;
   widthInput.value = sourceImage ? sourceImage.width : 1200;
   heightInput.value = sourceImage ? sourceImage.height : 800;
   backgroundInput.value = "#070812";

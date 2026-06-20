@@ -9,6 +9,13 @@ const formatSelect = document.querySelector("#format-select");
 const qualityInput = document.querySelector("#quality-input");
 const qualityOutput = document.querySelector("#quality-output");
 const backgroundInput = document.querySelector("#background-input");
+const transparentToggle = document.querySelector("#transparent-toggle");
+const selectedColorInput = document.querySelector("#selected-color-input");
+const colorToleranceInput = document.querySelector("#color-tolerance-input");
+const colorToleranceOutput = document.querySelector("#color-tolerance-output");
+const pickColorButton = document.querySelector("#pick-color-button");
+const removeColorButton = document.querySelector("#remove-color-button");
+const removeBackgroundButton = document.querySelector("#remove-background-button");
 const downloadButton = document.querySelector("#download-button");
 const resetButton = document.querySelector("#reset-button");
 const cropModeButton = document.querySelector("#crop-mode-button");
@@ -34,6 +41,8 @@ let imagePan = { x: 0, y: 0 };
 let imageDragging = false;
 let imageDragStart = null;
 let imagePanStart = null;
+let colorPickActive = false;
+let transparentBackground = false;
 
 function setStatus(text) {
   statusLabel.textContent = text;
@@ -43,11 +52,17 @@ function syncExportLabel() {
   exportSize.textContent = `${canvas.width} x ${canvas.height}`;
 }
 
+function fillCanvasBase(width, height) {
+  ctx.clearRect(0, 0, width, height);
+  if (transparentBackground) return;
+  ctx.fillStyle = backgroundInput.value;
+  ctx.fillRect(0, 0, width, height);
+}
+
 function drawPlaceholder() {
   canvas.width = Number(widthInput.value);
   canvas.height = Number(heightInput.value);
-  ctx.fillStyle = backgroundInput.value;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  fillCanvasBase(canvas.width, canvas.height);
   syncExportLabel();
 }
 
@@ -84,8 +99,7 @@ function drawImage(showOverlay = true) {
   canvas.height = targetHeight;
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
-  ctx.fillStyle = backgroundInput.value;
-  ctx.fillRect(0, 0, targetWidth, targetHeight);
+  fillCanvasBase(targetWidth, targetHeight);
 
   if (!sourceImage) {
     drawPlaceholder();
@@ -128,6 +142,152 @@ function updateQuality() {
   qualityOutput.textContent = `${qualityInput.value}%`;
 }
 
+function updateTolerance() {
+  colorToleranceOutput.textContent = colorToleranceInput.value;
+}
+
+function setTransparentMode(active) {
+  transparentBackground = active;
+  transparentToggle.checked = active;
+  drawImage();
+}
+
+function setColorPickMode(active) {
+  colorPickActive = active && Boolean(sourceImage);
+  pickColorButton.classList.toggle("is-active", colorPickActive);
+  canvas.classList.toggle("is-cropping", colorPickActive || cropActive);
+  canvas.classList.toggle("is-draggable", Boolean(sourceImage) && !cropActive && !colorPickActive);
+  if (colorPickActive) setStatus("Farbe im Bild anklicken");
+}
+
+function hexToRgb(hex) {
+  const value = hex.replace("#", "");
+  return {
+    r: parseInt(value.slice(0, 2), 16),
+    g: parseInt(value.slice(2, 4), 16),
+    b: parseInt(value.slice(4, 6), 16),
+  };
+}
+
+function rgbToHex(r, g, b) {
+  return `#${[r, g, b].map((value) => value.toString(16).padStart(2, "0")).join("")}`;
+}
+
+function colorDistance(data, index, color) {
+  const red = data[index] - color.r;
+  const green = data[index + 1] - color.g;
+  const blue = data[index + 2] - color.b;
+  return Math.sqrt(red * red + green * green + blue * blue);
+}
+
+function getSourceImageData() {
+  const workCanvas = document.createElement("canvas");
+  workCanvas.width = sourceImage.width;
+  workCanvas.height = sourceImage.height;
+  const workCtx = workCanvas.getContext("2d", { willReadFrequently: true });
+  workCtx.clearRect(0, 0, workCanvas.width, workCanvas.height);
+  workCtx.drawImage(sourceImage, 0, 0);
+  return {
+    canvas: workCanvas,
+    ctx: workCtx,
+    imageData: workCtx.getImageData(0, 0, workCanvas.width, workCanvas.height),
+  };
+}
+
+function replaceSourceFromImageData(canvasSource, ctxSource, imageData, suffix, status) {
+  ctxSource.putImageData(imageData, 0, 0);
+  const image = new Image();
+  image.addEventListener("load", () => {
+    sourceImage = image;
+    ratio = image.width / image.height;
+    imagePan = { x: 0, y: 0 };
+    sourceName = `${sourceName}-${suffix}`;
+    originalSize.textContent = `${image.width} x ${image.height}`;
+    formatSelect.value = "image/png";
+    setTransparentMode(true);
+    setCropMode(false);
+    setColorPickMode(false);
+    setStatus(status);
+    drawImage();
+  });
+  image.src = canvasSource.toDataURL("image/png");
+}
+
+function removeSelectedColor() {
+  if (!sourceImage) return;
+  const targetColor = hexToRgb(selectedColorInput.value);
+  const tolerance = Number(colorToleranceInput.value) * 1.73;
+  const { canvas: workCanvas, ctx: workCtx, imageData } = getSourceImageData();
+  const pixels = imageData.data;
+  let removed = 0;
+
+  for (let index = 0; index < pixels.length; index += 4) {
+    if (pixels[index + 3] === 0) continue;
+    if (colorDistance(pixels, index, targetColor) <= tolerance) {
+      pixels[index + 3] = 0;
+      removed += 1;
+    }
+  }
+
+  replaceSourceFromImageData(workCanvas, workCtx, imageData, "farbe-entfernt", `${removed.toLocaleString("de-DE")} Pixel entfernt`);
+}
+
+function removeBackground() {
+  if (!sourceImage) return;
+  const tolerance = Number(colorToleranceInput.value) * 1.73;
+  const { canvas: workCanvas, ctx: workCtx, imageData } = getSourceImageData();
+  const { width, height } = workCanvas;
+  const pixels = imageData.data;
+  const visited = new Uint8Array(width * height);
+  const queue = [];
+  const cornerIndexes = [0, width - 1, (height - 1) * width, height * width - 1];
+  const cornerColors = cornerIndexes.map((pixelIndex) => {
+    const index = pixelIndex * 4;
+    return { r: pixels[index], g: pixels[index + 1], b: pixels[index + 2] };
+  });
+  let removed = 0;
+
+  function matchesBackground(pixelIndex) {
+    const index = pixelIndex * 4;
+    if (pixels[index + 3] === 0) return true;
+    return cornerColors.some((color) => colorDistance(pixels, index, color) <= tolerance);
+  }
+
+  function enqueue(pixelIndex) {
+    if (visited[pixelIndex] || !matchesBackground(pixelIndex)) return;
+    visited[pixelIndex] = 1;
+    queue.push(pixelIndex);
+  }
+
+  for (let x = 0; x < width; x += 1) {
+    enqueue(x);
+    enqueue((height - 1) * width + x);
+  }
+
+  for (let y = 0; y < height; y += 1) {
+    enqueue(y * width);
+    enqueue(y * width + width - 1);
+  }
+
+  for (let cursor = 0; cursor < queue.length; cursor += 1) {
+    const pixelIndex = queue[cursor];
+    const index = pixelIndex * 4;
+    if (pixels[index + 3] !== 0) {
+      pixels[index + 3] = 0;
+      removed += 1;
+    }
+
+    const x = pixelIndex % width;
+    const y = Math.floor(pixelIndex / width);
+    if (x > 0) enqueue(pixelIndex - 1);
+    if (x < width - 1) enqueue(pixelIndex + 1);
+    if (y > 0) enqueue(pixelIndex - width);
+    if (y < height - 1) enqueue(pixelIndex + width);
+  }
+
+  replaceSourceFromImageData(workCanvas, workCtx, imageData, "hintergrund-entfernt", `${removed.toLocaleString("de-DE")} Hintergrund-Pixel entfernt`);
+}
+
 function setCropMode(active) {
   cropActive = active && Boolean(sourceImage);
   cropDragging = false;
@@ -136,7 +296,7 @@ function setCropMode(active) {
   imageDragging = false;
   cropPanel.hidden = !cropActive;
   canvas.classList.toggle("is-cropping", cropActive);
-  canvas.classList.toggle("is-draggable", Boolean(sourceImage) && !cropActive);
+  canvas.classList.toggle("is-draggable", Boolean(sourceImage) && !cropActive && !colorPickActive);
   canvas.classList.remove("is-panning");
   cropModeButton.classList.toggle("is-active", cropActive);
   applyCropButton.disabled = true;
@@ -223,6 +383,9 @@ function loadFile(file) {
       }
       downloadButton.disabled = false;
       cropModeButton.disabled = false;
+      pickColorButton.disabled = false;
+      removeColorButton.disabled = false;
+      removeBackgroundButton.disabled = false;
       canvas.classList.add("is-draggable");
       setCropMode(false);
       setStatus(`${file.name} geladen`);
@@ -250,6 +413,11 @@ heightInput.addEventListener("input", () => handleDimensionInput("height"));
 backgroundInput.addEventListener("input", drawImage);
 formatSelect.addEventListener("change", drawImage);
 qualityInput.addEventListener("input", updateQuality);
+colorToleranceInput.addEventListener("input", updateTolerance);
+transparentToggle.addEventListener("change", () => setTransparentMode(transparentToggle.checked));
+pickColorButton.addEventListener("click", () => setColorPickMode(!colorPickActive));
+removeColorButton.addEventListener("click", removeSelectedColor);
+removeBackgroundButton.addEventListener("click", removeBackground);
 cropModeButton.addEventListener("click", () => setCropMode(!cropActive));
 cancelCropButton.addEventListener("click", () => setCropMode(false));
 applyCropButton.addEventListener("click", applyCrop);
@@ -274,6 +442,16 @@ canvas.addEventListener("pointerdown", (event) => {
   event.preventDefault();
   canvas.setPointerCapture(event.pointerId);
   const point = getCanvasPoint(event);
+
+  if (colorPickActive) {
+    drawImage(false);
+    const pixel = ctx.getImageData(Math.round(point.x), Math.round(point.y), 1, 1).data;
+    selectedColorInput.value = rgbToHex(pixel[0], pixel[1], pixel[2]);
+    setColorPickMode(false);
+    setStatus(`Farbe ${selectedColorInput.value} gewählt`);
+    drawImage();
+    return;
+  }
 
   if (cropActive) {
     cropDragging = true;
@@ -380,4 +558,5 @@ downloadButton.addEventListener("click", () => {
 });
 
 updateQuality();
+updateTolerance();
 drawPlaceholder();
